@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -24,7 +24,7 @@
     <script type="text/babel">
         // --- NOTE: IMPORTANT ADAPTATIONS FOR SINGLE-FILE HOSTING ---
         // 1. Firebase/Auth is MOCKED. Data persistence (saving chat history) WILL NOT WORK here.
-        // 2. The Gemini API Key MUST be secured in a serverless function later, but is left blank for Canvas compatibility.
+        // 2. The API key is NO LONGER in this file. It must be secured in a Vercel Edge Function.
 
         // MOCKED/Simplified Firebase Setup
         const initialAuthToken = null;
@@ -163,9 +163,9 @@
             // --- Gemini API Call Function ---
             const fetchAIResponse = useCallback(async (currentHistory, promptType = 'practice', targetLanguage) => {
                 setIsLoading(true);
-                // NOTE: In a production environment, you MUST fill this apiKey or use a serverless function.
-                const apiKey = ""; 
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                
+                // --- URL has been changed to point to the local Vercel Edge Function ---
+                const apiUrl = '/api/generate'; 
                 
                 let customPrompt = T.practiceRequest + `"${topic}".`;
                 let persona;
@@ -193,7 +193,7 @@
                     2. When the student responds, provide concise, constructive feedback and correction using the **${targetLanguage}** language. When appropriate, subtly reference the correct verb tense by mentioning the corresponding **Dedo number** (e.g., "Eccellente! Hai usato correttamente il Dito 4 (Passato Semplice)..."). Then, continue the drill/conversation by asking the next question in **English**.
                     3. Maintain an encouraging and conversational tone throughout.`;
                 }
-
+                
                 const contents = currentHistory.map(msg => ({
                     role: msg.sender === 'AI' ? 'model' : 'user',
                     parts: [{ text: msg.text }]
@@ -216,10 +216,11 @@
 
                 while (attempt < maxRetries) {
                     try {
+                        // POST request goes to the local Vercel Edge Function endpoint
                         response = await fetch(apiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
+                            body: JSON.stringify({ payload: payload }) // Send the full payload to the serverless function
                         });
 
                         if (!response.ok) {
@@ -227,12 +228,14 @@
                         }
 
                         const result = await response.json();
-                        const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text || "Errore: Impossibile generare una risposta. Riprova.";
+                        // The serverless function should return the AI's text directly
+                        const aiText = result.text || "Errore: Impossibile generare una risposta. Riprova.";
                         return aiText;
                     } catch (error) {
+                        console.error(`Attempt ${attempt + 1} failed:`, error);
                         attempt++;
                         if (attempt >= maxRetries) {
-                            return "Sorry, a connection error occurred. Please check your network.";
+                            return "Desculpe, um erro de conexão ocorreu. Verifique sua rede ou a chave de API no Vercel.";
                         }
                         const delay = Math.pow(2, attempt) * 1000;
                         await new Promise(res => setTimeout(res, delay));
