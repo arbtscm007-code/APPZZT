@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Método Nau | Ze Zeus Teacher - AI Practice</title>
+    <!-- Tailwind CSS, React, and Babel dependencies loaded for single-file deployment -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* Custom Styles from the original component */
+        .font-inter { font-family: 'Inter', sans-serif; }
+        .chat-container { height: calc(100vh - 270px); }
+        @media (max-width: 640px) {
+            .chat-container { height: calc(100vh - 300px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- NOTE: IMPORTANT ADAPTATIONS FOR SINGLE-FILE HOSTING ---
+        // 1. Firebase/Auth is MOCKED. Data persistence (saving chat history) WILL NOT WORK here.
+        // 2. The API key is NO LONGER in this file. It must be secured in a Vercel Edge Function.
+
+        // MOCKED/Simplified Firebase Setup
+        const initialAuthToken = null;
+        const firebaseConfig = { apiKey: 'MOCK_API_KEY' }; 
+        const appId = 'permanent-app-id'; 
+
+        const initializeApp = (config) => ({});
+        const getAuth = (app) => ({});
+        const getFirestore = (app) => ({});
+        const signInAnonymously = (auth) => ({ user: { uid: crypto.randomUUID() } });
+        const signInWithCustomToken = (auth, token) => ({ user: { uid: crypto.randomUUID() } });
+        const onAuthStateChanged = (auth, callback) => {
+             // Mock immediate sign-in for demonstration
+             setTimeout(() => callback({ uid: crypto.randomUUID() }), 100);
+             return () => {};
+        };
+        
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // --- Translation Dictionary (Copied from final LanguageTutorApp.jsx) ---
+        const UILabels = {
+            pt: {
+                method: "Método Nau | Ze Zeus Teacher",
+                subtitle: "Prática de Idiomas com IA baseada na metodologia dos 23 Dedos (Tabela de Formação Verbal).",
+                sessionID: "ID de Sessão:",
+                step1: "1. Escolha o Tópico de Prática",
+                placeholderTopic: "Ex: Dedo 5, Vocabulário de Viagem, Escrever Email de Negócios",
+                start: "Começar Prática",
+                starting: "Iniciando...",
+                new: "Nova Prática",
+                clickToStart: "Clique em \"Começar Prática\" para iniciar sua sessão sobre ",
+                enterTopic: "Digite um tópico acima para começar. O Ze Zeus vai preparar um cenário de conversação ou exercício personalizado para você!",
+                typing: "Ze Zeus Teacher está digitando...",
+                yourResponse: "Sua resposta (ou 'Dedo 1' para revisar o Presente Simples)",
+                tip: "Dica: Digite **Dedo [Número]** (ex: Dedo 4) para revisar a estrutura da Tabela Nau a qualquer momento!",
+                send: "Enviar",
+                aiLabel: "Ze Zeus Teacher (AI Tutor)",
+                userLabel: "Você",
+                languageSelector: "Idioma da Interface:",
+                practiceRequest: "Quero praticar: "
+            },
+            it: {
+                method: "Metodo Nau | Ze Zeus Teacher",
+                subtitle: "Pratica linguistica AI basata sulla metodologia dei 23 Dita (Tabella della Formazione Verbale).",
+                sessionID: "ID Sessione:",
+                step1: "1. Scegli l'Argomento di Pratica",
+                placeholderTopic: "Es: Dito 5, Vocabolario di Viaggio, Scrivere Email Commerciali",
+                start: "Inizia Pratica",
+                starting: "Avvio...",
+                new: "Nuova Pratica",
+                clickToStart: "Clicca su \"Inizia Pratica\" per iniziare la tua sessione su ",
+                enterTopic: "Inserisci un argomento qui sopra per iniziare. Ze Zeus preparerà uno scenario di conversazione o un esercizio personalizado per te!",
+                typing: "Ze Zeus Teacher sta scrivendo...",
+                yourResponse: "La tua risposta (ou 'Dito 1' per ripassare il Present Simple)",
+                tip: "Consiglio: Digita **Dito [Numero]** (es: Dito 4) per ripassare la struttura della Tabella Nau in qualsiasi momento!",
+                send: "Invia",
+                aiLabel: "Ze Zeus Teacher (AI Tutor)",
+                userLabel: "Tu",
+                languageSelector: "Lingua dell'Interfaccia:",
+                practiceRequest: "Voglio praticare: "
+            },
+            es: {
+                method: "Método Nau | Ze Zeus Teacher",
+                subtitle: "Práctica de Idiomas con IA basada en la metodología de los 23 Dedos (Tabla de Formación Verbal).",
+                sessionID: "ID de Sesión:",
+                step1: "1. Elige el Tema de Práctica",
+                placeholderTopic: "Ej: Dedo 5, Vocabulario de Viaje, Escribir Correo Electrónico de Negocios",
+                start: "Empezar Práctica",
+                starting: "Iniciando...",
+                new: "Nueva Práctica",
+                clickToStart: "Haz clic en \"Empezar Práctica\" para iniciar tu sesión sobre ",
+                enterTopic: "Escribe un tema arriba para empezar. ¡Ze Zeus preparará un escenario de conversación o un ejercicio personalizado para ti!",
+                typing: "Ze Zeus Teacher está escribiendo...",
+                yourResponse: "Tu respuesta (o 'Dedo 1' para repasar el Presente Simple)",
+                tip: "Consejo: Escribe **Dedo [Número]** (ej: Dedo 4) para repasar la estructura de la Tabla Nau en cualquier momento!",
+                send: "Enviar",
+                aiLabel: "Ze Zeus Teacher (AI Tutor)",
+                userLabel: "Tú",
+                languageSelector: "Idioma de la Interfaz:",
+                practiceRequest: "Quiero practicar: "
+            },
+            en: {
+                method: "Nau Method | Ze Zeus Teacher",
+                subtitle: "AI Language Practice based on the 23 Dedo (Verbal Formation Chart) methodology.",
+                sessionID: "Session ID:",
+                step1: "1. Choose Practice Topic",
+                placeholderTopic: "Ex: Dedo 5, Travel Vocabulary, Writing a Business Email",
+                start: "Start Practice",
+                starting: "Starting...",
+                new: "New Practice",
+                clickToStart: "Click \"Start Practice\" to begin your session on ",
+                enterTopic: "Enter a topic above to start. Ze Zeus will prepare a personalized conversation scenario or exercise for you!",
+                typing: "Ze Zeus Teacher is typing...",
+                yourResponse: "Your response (or 'Dedo 1' to review the Present Simple)",
+                tip: "Tip: Type **Dedo [Number]** (e.g., Dedo 4) to review the Nau Chart structure at any time!",
+                send: "Send",
+                aiLabel: "Ze Zeus Teacher (AI Tutor)",
+                userLabel: "You",
+                languageSelector: "Interface Language:",
+                practiceRequest: "I want to practice: "
+            }
+        };
+
+
+        // --- Main App Component ---
+        const App = () => {
+            const [topic, setTopic] = useState('');
+            const [messageInput, setMessageInput] = useState('');
+            const [chatHistory, setChatHistory] = useState([]);
+            const [isLoading, setIsLoading] = useState(false);
+            const [userId, setUserId] = useState(null);
+            const [isAuthReady, setIsAuthReady] = useState(false);
+            const [interfaceLanguage, setInterfaceLanguage] = useState('pt'); 
+
+            const T = UILabels[interfaceLanguage] || UILabels['pt']; 
+            const chatContainerRef = useRef(null);
+
+            // Mocked Auth Init
+            useEffect(() => {
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                
+                const unsubscribe = onAuthStateChanged(auth, async (user) => {
+                    setUserId(user ? user.uid : crypto.randomUUID());
+                    setIsAuthReady(true);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (chatContainerRef.current) {
+                    chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+                }
+            }, [chatHistory]);
+
+            // --- Gemini API Call Function ---
+            const fetchAIResponse = useCallback(async (currentHistory, promptType = 'practice', targetLanguage) => {
+                setIsLoading(true);
+                
+                // --- URL has been changed to point to the local Vercel Edge Function ---
+                const apiUrl = '/api/generate'; 
+                
+                let customPrompt = T.practiceRequest + `"${topic}".`;
+                let persona;
+                
+                const langInstruction = `Use **${targetLanguage}** for all instructions, guidance, feedback, and explanations.`;
+
+                if (promptType === 'lookup') {
+                    const dedoCommand = currentHistory[currentHistory.length - 1].text;
+                    const dedoNumberMatch = dedoCommand.match(/dedo\s*(\d+)|dito\s*(\d+)/i);
+                    const dedoNumber = dedoNumberMatch ? (dedoNumberMatch[1] || dedoNumberMatch[2]) : 'the main topic (Verbal Structure)';
+
+                    const modalRefinement = (parseInt(dedoNumber) >= 11 && parseInt(dedoNumber) <= 17) 
+                                            ? "Also, include the corresponding Compound Tenses (Modal + BE + V-ING and Modal + HAVE + V3) in your explanation, referring to them as Tempos Compostos." 
+                                            : "";
+
+                    persona = `You are Ze Zeus Teacher, the AI expert on the Método Nau. Your only task now is to provide a complete, clear, and comprehensive explanation for the **${dedoCommand}** from the "Tabela de Formação Verbal" (23 Dedos), exactly as presented in the methodology. ${langInstruction} ${modalRefinement} DO NOT START A CONVERSATION after this explanation.`;
+                    customPrompt = `Explain in detail the ${dedoCommand} of Professor Mathias Nau's Verbal Formation Chart.`;
+                } else {
+                    persona = `You are Ze Zeus Teacher, the AI counterpart to Professor Mathias Nau. You are a friendly, encouraging, and highly knowledgeable language tutor specializing in English. You **must strictly follow the 23 DEDOS (Verbal Formation Chart)** methodology in all your teaching and feedback. ${langInstruction}
+                    
+                    TASK: Help the student practice the topic: "${topic}". Use English for the core practice material (scenarios, questions, conversational parts).
+                    
+                    RESPONSE RULES:
+                    1. When the conversation starts (first turn), generate a challenging, context-rich scenario or question in **English** related to the topic.
+                    2. When the student responds, provide concise, constructive feedback and correction using the **${targetLanguage}** language. When appropriate, subtly reference the correct verb tense by mentioning the corresponding **Dedo number** (e.g., "Eccellente! Hai usato correttamente il Dito 4 (Passato Semplice)..."). Then, continue the drill/conversation by asking the next question in **English**.
+                    3. Maintain an encouraging and conversational tone throughout.`;
+                }
+                
+                const contents = currentHistory.map(msg => ({
+                    role: msg.sender === 'AI' ? 'model' : 'user',
+                    parts: [{ text: msg.text }]
+                }));
+                
+                if (promptType === 'lookup') {
+                    contents.push({ role: 'user', parts: [{ text: customPrompt }] });
+                }
+                
+                const payload = {
+                    contents: contents,
+                    systemInstruction: {
+                        parts: [{ text: persona }]
+                    },
+                };
+
+                const maxRetries = 3;
+                let attempt = 0;
+                let response;
+
+                while (attempt < maxRetries) {
+                    try {
+                        // POST request goes to the local Vercel Edge Function endpoint
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ payload: payload }) // Send the full payload to the serverless function
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        // The serverless function should return the AI's text directly
+                        const aiText = result.text || "Errore: Impossibile generare una risposta. Riprova.";
+                        return aiText;
+                    } catch (error) {
+                        console.error(`Attempt ${attempt + 1} failed:`, error);
+                        attempt++;
+                        if (attempt >= maxRetries) {
+                            return "Desculpe, um erro de conexão ocorreu. Verifique sua rede ou a chave de API no Vercel.";
+                        }
+                        const delay = Math.pow(2, attempt) * 1000;
+                        await new Promise(res => setTimeout(res, delay));
+                    }
+                }
+            }, [topic, interfaceLanguage]);
+
+            // --- Interaction Handlers ---
+            const startPracticeSession = async () => {
+                if (!topic.trim() || isLoading) return;
+                const initialMessage = { sender: 'User', text: T.practiceRequest + topic };
+                setChatHistory([initialMessage]);
+                const aiResponse = await fetchAIResponse([initialMessage], 'practice', interfaceLanguage);
+                setChatHistory(prev => [...prev, { sender: 'AI', text: aiResponse }]);
+                setIsLoading(false);
+            };
+
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                const text = messageInput.trim();
+                if (!text || isLoading) return;
+                setMessageInput('');
+                const newUserMessage = { sender: 'User', text: text };
+                const isLookupCommand = text.toLowerCase().includes('dedo') || text.toLowerCase().includes('dito');
+                const updatedHistory = [...chatHistory, newUserMessage];
+                setChatHistory(updatedHistory);
+                const promptType = isLookupCommand ? 'lookup' : 'practice';
+                const aiResponse = await fetchAIResponse(updatedHistory, promptType, interfaceLanguage);
+                setChatHistory(prev => [...prev, { sender: 'AI', text: aiResponse }]);
+                setIsLoading(false);
+            };
+
+            const resetApp = () => {
+                setTopic('');
+                setChatHistory([]);
+                setMessageInput('');
+                setIsLoading(false);
+            };
+
+            // --- Helper Components ---
+            const LanguageSelector = () => (
+                <select
+                    value={interfaceLanguage}
+                    onChange={(e) => setInterfaceLanguage(e.target.value)}
+                    className="p-1 border border-indigo-300 rounded-lg text-sm bg-white focus:ring-indigo-500"
+                >
+                    <option value="pt">Português</option>
+                    <option value="it">Italiano</option>
+                    <option value="es">Español</option>
+                    <option value="en">English</option>
+                </select>
+            );
+
+            const ChatMessage = ({ message }) => {
+                const isAI = message.sender === 'AI';
+                return (
+                    <div className={`flex ${isAI ? 'justify-start' : 'justify-end'} mb-4`}>
+                        <div className={`max-w-3/4 p-3 rounded-xl shadow-md ${isAI ? 'bg-indigo-100 text-indigo-900 rounded-bl-none' : 'bg-indigo-600 text-white rounded-br-none'}`}>
+                            <div className="font-semibold text-xs mb-1 opacity-70">
+                                {isAI ? T.aiLabel : T.userLabel}
+                            </div>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- Main Render ---
+            return (
+                <div className="min-h-screen bg-gray-50 flex flex-col font-inter p-4 sm:p-6 md:p-8">
+                    {/* Header */}
+                    <header className="mb-6 pb-4 border-b border-indigo-200">
+                        <div className="flex justify-between items-start mb-2">
+                            {/* Logo and Main Title Container */}
+                            <div className="flex items-center space-x-4">
+                                <img 
+                                    src="https://placehold.co/96x96/4C51BF/FFFFFF?text=M+N\nZ+Z+T"
+                                    alt="Professor Mathias Nau and Ze Zeus Teacher Logo"
+                                    className="w-20 h-20 sm:w-24 sm:h-24 object-contain shadow-xl rounded-xl"
+                                />
+                                <h1 className="text-3xl sm:text-4xl font-extrabold text-indigo-700">
+                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
+                                        {T.method}
+                                    </span>
+                                </h1>
+                            </div>
+                            
+                            {/* Language Selector Container */}
+                            <div className="flex flex-col items-end">
+                                <span className="text-xs font-semibold text-gray-500 mb-1">{T.languageSelector}</span>
+                                <LanguageSelector />
+                            </div>
+                        </div>
+                        <p className="text-gray-600 mt-1">
+                            {T.subtitle}
+                        </p>
+                        {isAuthReady && userId && (
+                            <p className="text-xs text-gray-400 mt-2">
+                                {T.sessionID} {userId}
+                            </p>
+                        )}
+                    </header>
+
+                    {/* Topic Setter */}
+                    <div className={`mb-4 p-4 rounded-xl shadow-lg transition-all duration-300 ${chatHistory.length > 0 ? 'bg-white/90' : 'bg-white'}`}>
+                        <h2 className="text-lg font-bold text-indigo-700 mb-2">
+                            {T.step1}
+                        </h2>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                                type="text"
+                                value={topic}
+                                onChange={(e) => setTopic(e.target.value)}
+                                placeholder={T.placeholderTopic}
+                                className="flex-grow p-3 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                                disabled={chatHistory.length > 0 || isLoading}
+                            />
+                            {chatHistory.length === 0 ? (
+                                <button
+                                    onClick={startPracticeSession}
+                                    disabled={!topic.trim() || isLoading}
+                                    className="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150 disabled:bg-indigo-300"
+                                >
+                                    {isLoading ? T.starting : T.start}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={resetApp}
+                                    className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-150"
+                                >
+                                    {T.new}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Chat Area */}
+                    <main className="flex-grow bg-white rounded-xl shadow-2xl p-4 flex flex-col overflow-hidden">
+                        {chatHistory.length === 0 && topic.length > 0 && (
+                            <div className="flex-grow flex items-center justify-center text-gray-500">
+                                {T.clickToStart} **{topic}**.
+                            </div>
+                        )}
+
+                        {chatHistory.length === 0 && topic.length === 0 && (
+                            <div className="flex-grow flex items-center justify-center text-center text-gray-500 p-8">
+                                <p>{T.enterTopic}</p>
+                            </div>
+                        )}
+
+                        <div ref={chatContainerRef} className="chat-container overflow-y-auto pr-2 pb-4">
+                            {chatHistory.map((msg, index) => (
+                                <ChatMessage key={index} message={msg} />
+                            ))}
+
+                            {isLoading && chatHistory.length > 0 && (
+                                 <div className="flex justify-start mb-4">
+                                    <div className="bg-indigo-100 p-3 rounded-xl rounded-bl-none shadow-md">
+                                        <span className="text-sm text-indigo-900 animate-pulse">{T.typing}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Message Input */}
+                        {chatHistory.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                                 <p className="text-xs text-center text-purple-500 mb-2 font-medium" dangerouslySetInnerHTML={{ __html: T.tip }}></p>
+                                <form onSubmit={sendMessage} className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={messageInput}
+                                        onChange={(e) => setMessageInput(e.target.value)}
+                                        placeholder={T.yourResponse}
+                                        className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 transition duration-150"
+                                        disabled={isLoading}
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!messageInput.trim() || isLoading}
+                                        className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition duration-150 disabled:bg-purple-300 flex items-center justify-center"
+                                    >
+                                        <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                        {T.send}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
